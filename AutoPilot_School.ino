@@ -1,30 +1,33 @@
 #include "HUSKYLENS.h"
 #include "SoftwareSerial.h"
-#define IN1_L 3
-#define IN2_L 2
-#define IN3_L 1
-#define IN4_L 0
-#define IN1_R 7
-#define IN2_R 6
-#define IN3_R 5
-#define IN4_R 4
+#define DIR_L 2
+#define PWM_L 3
+#define DIR_R 4
+#define PWM_R 5
+#define BUTTON 13
+
+#define FSPEED 100
+#define RSPEED 60
+#define delayTime 100
+
+#define RCriteria 30
+
+void forward();
+void stop();
+void turnR();
+void turnL();
 
 HUSKYLENS huskylens;
 SoftwareSerial mySerial(10, 11); // RX, TX
 //HUSKYLENS green line >> Pin 10; blue line >> Pin 11
-void printResult(HUSKYLENSResult result);
-
 void setup() {
     Serial.begin(115200);
     mySerial.begin(9600);
-    pinMode(IN1_L, OUTPUT);
-    pinMode(IN2_L, OUTPUT);
-    pinMode(IN3_L, OUTPUT);
-    pinMode(IN4_L, OUTPUT);
-    pinMode(IN1_R, OUTPUT);
-    pinMode(IN2_R, OUTPUT);
-    pinMode(IN3_R, OUTPUT);
-    pinMode(IN4_R, OUTPUT);
+    pinMode(DIR_L, OUTPUT);
+    pinMode(PWM_L, OUTPUT);
+    pinMode(DIR_R, OUTPUT);
+    pinMode(PWM_R, OUTPUT);
+    pinMode(BUTTON, INPUT);
     while (!huskylens.begin(mySerial))
     {
         Serial.println(F("Begin failed!"));
@@ -35,48 +38,74 @@ void setup() {
 }
 
 void loop() {
-    if (!huskylens.request()) Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
-    else if(!huskylens.isLearned()) Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
-    else if(!huskylens.available()) Serial.println(F("No block or arrow appears on the screen!"));
-    else
-    {
-        Serial.println(F("###########"));
-        while (huskylens.available())
-        {
-            HUSKYLENSResult result = huskylens.read();
-            int xdelta = result.xOrigin - result.xTarget;
-            Serial.println(String()+F("Origin_axis: (")+result.xOrigin+F(", ")+result.yOrigin+F(") / Target_axis: (")+result.xTarget+F(", ")+result.yTarget+F(") ")+result.ID+F(" / xdiff: ")+xdelta);
-            if(xdelta<0){
-              digitalWrite(IN1_L, HIGH);
-              digitalWrite(IN2_L, HIGH);
-              digitalWrite(IN3_L, HIGH);
-              digitalWrite(IN4_L, HIGH);
-              digitalWrite(IN1_R, LOW);
-              digitalWrite(IN2_R, LOW);
-              digitalWrite(IN3_R, LOW);
-              digitalWrite(IN4_R, LOW); //왼쪽 모터 활성화
-            }
-            else if(xdelta == 0){
-              digitalWrite(IN1_L, HIGH);
-              digitalWrite(IN2_L, HIGH);
-              digitalWrite(IN3_L, HIGH);
-              digitalWrite(IN4_L, HIGH);
-              digitalWrite(IN1_R, HIGH);
-              digitalWrite(IN2_R, HIGH);
-              digitalWrite(IN3_R, HIGH);
-              digitalWrite(IN4_R, HIGH); //둘 다 활성화
-            }
-            else if(xdela>0){
-              digitalWrite(IN1_L, LOW;
-              digitalWrite(IN2_L, LOW);
-              digitalWrite(IN3_L, LOW);
-              digitalWrite(IN4_L, LOW);
-              digitalWrite(IN1_R, HIGH);
-              digitalWrite(IN2_R, HIGH);
-              digitalWrite(IN3_R, HIGH);
-              digitalWrite(IN4_R, HIGH); //오른쪽 모터 활성화
-            } 
-            
-        }    
+  int buttonState = digitalRead(BUTTON);
+  if (!huskylens.request()) Serial.println(F("Fail to request data from HUSKYLENS, recheck the connection!"));
+  else if(!huskylens.isLearned()) Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
+  else if(!huskylens.available()) {
+    Serial.print(F("No block or arrow appears on the screen!"));
+    Serial.println(String()+F("정지?"));
+    stop();
     }
+  else
+  {
+    Serial.println(F("###########"));
+    while (huskylens.available())
+    {
+      HUSKYLENSResult result = huskylens.read();
+      int xdelta = result.xOrigin - result.xTarget;
+      int xavg = (result.xOrigin + result.xTarget) / 2;
+      Serial.print(String()+F("Origin_axis: (")+result.xOrigin+F(", ")+result.yOrigin+F(") / Target_axis: (")+result.xTarget+F(", ")+result.yTarget+F(") ")+result.ID+F(" / xdiff: ")+xdelta);
+      if (buttonState == 0) { // 버튼 눌렀을 때
+        
+        if(xdelta <= -RCriteria){ // 우측 ㄱㄱ
+          Serial.println(String()+F("우회전"));
+          turnR();
+        }
+        else if(xdelta >= RCriteria){ // 좌측 ㄱㄱ
+        Serial.println(String()+F("좌회전"));
+          turnL();
+        }
+        else{ // 앞으로
+        Serial.println(String()+F("전진"));
+          forward();
+        } 
+      }
+      else {
+        Serial.println(String()+F("정지"));
+        stop();
+      }
+    }
+  }
 }
+
+void forward() {
+  digitalWrite(DIR_L, LOW); // LOW -> 전진 
+  analogWrite(PWM_L, FSPEED);
+  digitalWrite(DIR_R, LOW); // LOW -> 전진
+  analogWrite(PWM_R, FSPEED);
+  delay(delayTime);
+}
+
+void stop() {
+  analogWrite(PWM_L, 0);
+  analogWrite(PWM_R, 0);
+  delay(delayTime);
+}
+
+void turnR() {
+  digitalWrite(DIR_L, LOW); // LOW -> 전진 
+  analogWrite(PWM_L, RSPEED);
+  digitalWrite(DIR_R, HIGH); // LOW -> 전진
+  analogWrite(PWM_R, RSPEED);
+  delay(delayTime);
+}
+
+void turnL() {
+  digitalWrite(DIR_L, HIGH); // LOW -> 전진 
+  analogWrite(PWM_L, RSPEED);
+  digitalWrite(DIR_R, LOW); // LOW -> 전진
+  analogWrite(PWM_R, RSPEED);
+  delay(delayTime);
+}
+
+
