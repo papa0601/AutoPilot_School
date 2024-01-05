@@ -6,16 +6,24 @@
 #define PWM_R 5
 #define BUTTON 13
 
-#define FSPEED 100
-#define RSPEED 60
+//#define FSPEED 100
+//#define RSPEED 60
+
+#define DEFAULTSPD 100
+#define EXTRASPD 40
 #define delayTime 100
 
 #define RCriteria 30
+#define ACriteria 0
+#define LOCriteria 60
 
-void forward();
-void stop();
-void turnR();
-void turnL();
+//void forward();
+//void stop();
+//void turnR();
+//void turnL();
+
+void drive(int LSPEED, int RSPEED);
+void rear();
 
 HUSKYLENS huskylens;
 SoftwareSerial mySerial(10, 11); // RX, TX
@@ -43,8 +51,9 @@ void loop() {
   else if(!huskylens.isLearned()) Serial.println(F("Nothing learned, press learn button on HUSKYLENS to learn one!"));
   else if(!huskylens.available()) {
     Serial.print(F("No block or arrow appears on the screen!"));
-    Serial.println(String()+F("정지?"));
-    stop();
+    Serial.println(String()+F(" 후진"));
+    if (buttonState == 0)
+      rear();
     }
   else
   {
@@ -56,28 +65,49 @@ void loop() {
       int xavg = (result.xOrigin + result.xTarget) / 2;
       Serial.print(String()+F("Origin_axis: (")+result.xOrigin+F(", ")+result.yOrigin+F(") / Target_axis: (")+result.xTarget+F(", ")+result.yTarget+F(") ")+result.ID+F(" / xdiff: ")+xdelta);
       if (buttonState == 0) { // 버튼 눌렀을 때
-        
-        if(xdelta <= -RCriteria){ // 우측 ㄱㄱ
+        if (xdelta <= -RCriteria && result.xTarget >= 160 + ACriteria || xavg >= 160 + LOCriteria){ // 우측 ㄱㄱ
           Serial.println(String()+F("우회전"));
-          turnR();
+          drive(DEFAULTSPD + EXTRASPD, DEFAULTSPD);
+          //turnR();
         }
-        else if(xdelta >= RCriteria){ // 좌측 ㄱㄱ
-        Serial.println(String()+F("좌회전"));
-          turnL();
+        else if (xdelta >= RCriteria && result.xTarget <= 160 - ACriteria || xavg <= 160 - LOCriteria){ // 좌측 ㄱㄱ
+          Serial.println(String()+F("좌회전"));
+          drive(DEFAULTSPD, DEFAULTSPD + EXTRASPD);
+          //turnL();
         }
-        else{ // 앞으로
-        Serial.println(String()+F("전진"));
-          forward();
-        } 
+        else { // 앞으로
+          Serial.println(String()+F("전진"));
+          drive(DEFAULTSPD, DEFAULTSPD);
+          //forward();
+        }
       }
+      
       else {
         Serial.println(String()+F("정지"));
-        stop();
+        drive(0, -17);
+        //stop();
       }
     }
   }
 }
 
+void drive(int LSPEED, int RSPEED) {
+  digitalWrite(DIR_L, LOW);
+  digitalWrite(DIR_R, LOW);
+  analogWrite(PWM_L, LSPEED);
+  analogWrite(PWM_R, RSPEED+17);
+  delay(delayTime);
+}
+
+void rear() {
+  digitalWrite(DIR_L, HIGH);
+  digitalWrite(DIR_R, HIGH);
+  analogWrite(PWM_L, 80);
+  analogWrite(PWM_R, 80+17);
+  delay(1000);
+}
+
+/*
 void forward() {
   digitalWrite(DIR_L, LOW); // LOW -> 전진 
   analogWrite(PWM_L, FSPEED);
@@ -107,5 +137,6 @@ void turnL() {
   analogWrite(PWM_R, RSPEED);
   delay(delayTime);
 }
+*/
 
 
